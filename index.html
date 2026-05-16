@@ -1,1 +1,135 @@
+import pygame
+import sys
+import random
 
+# Inisialisasi Pygame
+pygame.init()
+
+# Pengaturan Layar
+SCREEN_WIDTH = 400
+SCREEN_HEIGHT = 600
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+pygame.display.set_caption("Flying Bird Game")
+clock = pygame.time.Clock()
+
+# Warna (RGB)
+WHITE = (255, 255, 255)
+SKY_BLUE = (113, 197, 207)
+BIRD_YELLOW = (247, 202, 24)
+PIPE_GREEN = (115, 191, 46)
+
+# Variabel Game
+gravity = 0.25
+bird_movement = 0
+game_active = True
+score = 0
+
+# Font untuk Skor
+main_font = pygame.font.SysFont("Segoe UI", 40, bold=True)
+
+# Membuat Karakter Burung (Kotak sebagai representasi)
+bird_rect = pygame.Rect(100, 300, 30, 30)
+
+# Variabel Pipa
+pipe_list = []
+SPAWNPIPE = pygame.USEREVENT
+pygame.time.set_timer(SPAWNPIPE, 1200) # Pipa baru muncul setiap 1.2 detik
+pipe_heights = [200, 300, 400]
+pipe_gap = 150 # Jarak vertikal antara pipa atas dan bawah
+
+def create_pipe():
+    random_pipe_pos = random.choice(pipe_heights)
+    bottom_pipe = pygame.Rect(SCREEN_WIDTH, random_pipe_pos, 70, SCREEN_HEIGHT)
+    top_pipe = pygame.Rect(SCREEN_WIDTH, random_pipe_pos - pipe_gap - SCREEN_HEIGHT, 70, SCREEN_HEIGHT)
+    return bottom_pipe, top_pipe
+
+def move_pipes(pipes):
+    for pipe in pipes:
+        pipe.centerx -= 5
+    # Hapus pipa yang sudah keluar layar agar hemat memori
+    visible_pipes = [pipe for pipe in pipes if pipe.right > -50]
+    return visible_pipes
+
+def draw_pipes(pipes):
+    for pipe in pipes:
+        pygame.draw.rect(screen, PIPE_GREEN, pipe)
+
+def check_collision(pipes):
+    for pipe in pipes:
+        if bird_rect.colliderect(pipe):
+            return False
+    if bird_rect.top <= 0 or bird_rect.bottom >= SCREEN_HEIGHT:
+        return False
+    return True
+
+def display_score():
+    score_surface = main_font.render(f"Score: {int(score)}", True, WHITE)
+    score_rect = score_surface.get_rect(center=(SCREEN_WIDTH // 2, 50))
+    screen.blit(score_surface, score_rect)
+
+def display_game_over():
+    over_surface = main_font.render("GAME OVER", True, (200, 0, 0))
+    over_rect = over_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 30))
+    
+    retry_font = pygame.font.SysFont("Segoe UI", 20)
+    retry_surface = retry_font.render("Tekan SPACE untuk Main Lagi", True, WHITE)
+    retry_rect = retry_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 20))
+    
+    screen.blit(over_surface, over_rect)
+    screen.blit(retry_surface, retry_rect)
+
+# Game Loop Utama
+while True:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            sys.exit()
+            
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_SPACE and game_active:
+                bird_movement = 0
+                bird_movement -= 6 # Kekuatan lompat burung
+                
+            if event.key == pygame.K_SPACE and not game_active:
+                # Reset game saat game over
+                game_active = True
+                pipe_list.clear()
+                bird_rect.center = (100, 300)
+                bird_movement = 0
+                score = 0
+                
+        if event.type == SPAWNPIPE and game_active:
+            pipe_list.extend(create_pipe())
+
+    # Menggambar Latar Belakang
+    screen.fill(SKY_BLUE)
+
+    if game_active:
+        # Pergerakan Burung
+        bird_movement += gravity
+        bird_rect.centery += int(bird_movement)
+        pygame.draw.rect(screen, BIRD_YELLOW, bird_rect)
+        
+        # Deteksi Tabrakan
+        game_active = check_collision(pipe_list)
+        
+        # Pergerakan dan Menggambar Pipa
+        pipe_list = move_pipes(pipe_list)
+        draw_pipes(pipe_list)
+        
+        # Hitung Skor (Skor bertambah jika berhasil melewati pipa)
+        for pipe in pipe_list:
+            if pipe.centerx == bird_rect.centerx:
+                score += 0.5 # Karena ada 2 pipa (atas & bawah), 0.5 + 0.5 = 1
+
+        display_score()
+    else:
+        # Tampilan jika Game Over
+        draw_pipes(pipe_list)
+        pygame.draw.rect(screen, BIRD_YELLOW, bird_rect)
+        display_game_over()
+        display_score()
+
+    # Update Layar
+    pygame.display.update()
+    clock.tick(60) # Mengunci game di 60 FPS
